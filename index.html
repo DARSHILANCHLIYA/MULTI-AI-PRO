@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MULTI AI PRO</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1e1e1e; }
+    ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
+
+    #sidebar { transition: transform 0.3s ease-in-out, margin-left 0.3s ease-in-out; z-index: 50; }
+    .sidebar-closed { margin-left: -18rem; }
+
+    @media (max-width: 768px) {
+        #sidebar { position: fixed; height: 100%; margin-left: 0; transform: translateX(-100%); width: 280px; }
+        #sidebar.mobile-open { transform: translateX(0); box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
+        .mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 40; backdrop-filter: blur(2px); }
+        .mobile-overlay.active { display: block; }
+        #desktop-sidebar-toggle { display: none; }
+    }
+
+    .model-slider { position: relative; display: flex; background: #2f2f2f; padding: 4px; border-radius: 12px; }
+    .model-option { position: relative; padding: 6px 16px; cursor: pointer; font-size: 13px; z-index: 10; transition: color 0.3s; font-weight: 500; }
+    .slider-bg { position: absolute; height: calc(100% - 8px); background: #3b82f6; border-radius: 8px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1; }
+
+    .action-badge { background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-bottom: 4px; display: inline-block; }
+    .message-actions { position: absolute; top: -10px; right: 10px; display: none; gap: 4px; background: #2d2d2d; padding: 4px; border-radius: 8px; border: 1px solid #4b5563; z-index: 10; }
+    .message-container:hover .message-actions { display: flex; }
+    .message-action-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: #374151; color: #9ca3af; cursor: pointer; transition: all 0.2s; font-size: 12px; }
+    .message-action-btn:hover { background: #4b5563; color: white; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+</style>
+</head>
+<body class="bg-[#1e1e1e] text-gray-200 flex h-screen overflow-hidden font-sans">
+
+<div id="mobileOverlay" class="mobile-overlay" onclick="toggleSidebarMobile()"></div>
+
+<div id="apiKeyModal" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center hidden backdrop-blur-md px-4">
+    <div class="bg-[#2d2d2d] p-8 rounded-2xl border border-gray-700 w-full max-w-sm text-center">
+        <h3 class="text-xl font-bold mb-2 text-white">Groq Activation</h3>
+        <input type="password" id="apiKeyInput" class="w-full bg-[#1e1e1e] border border-gray-600 rounded-lg p-3 text-sm outline-none focus:border-blue-500 mb-4 text-white" placeholder="GROQ API KEY">
+        <button onclick="saveApiKey()" class="w-full py-3 bg-blue-600 rounded-lg font-bold text-white hover:bg-blue-500 transition shadow-lg">Initialize AI</button>
+    </div>
+</div>
+
+<aside id="sidebar" class="w-72 bg-[#171717] flex flex-col border-r border-gray-800 relative shrink-0">
+    <button id="desktop-sidebar-toggle" onclick="toggleSidebarDesktop()" class="absolute -right-8 top-6 bg-[#171717] p-2 w-8 h-10 border-y border-r border-gray-800 rounded-r-lg text-gray-400">
+        <i id="toggleIcon" class="fa-solid fa-chevron-left text-xs"></i>
+    </button>
+    
+    <div class="p-4 flex flex-col h-full">
+        <div class="mb-8 px-2">
+            <h1 class="text-2xl font-black text-white tracking-tighter italic">
+                MULTI <span class="text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]">AI PRO</span>
+            </h1>
+            <div class="flex items-center gap-2 mt-2 opacity-80">
+                <div class="flex gap-1">
+                    <div class="w-1 h-1 rounded-full bg-blue-500"></div>
+                    <div class="w-1 h-1 rounded-full bg-purple-500"></div>
+                    <div class="w-1 h-1 rounded-full bg-green-500"></div>
+                </div>
+                <span class="text-[9px] text-gray-500 uppercase font-bold tracking-[0.2em]">Autonomous Agent v1.0</span>
+            </div>
+        </div>
+
+        <button onclick="createNewChat()" class="flex items-center gap-3 border border-gray-800 bg-[#1e1e1e] hover:bg-[#252525] rounded-2xl p-4 mb-8 transition-all group shadow-lg">
+            <div class="bg-blue-600 p-2 rounded-lg group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-plus text-white text-xs"></i>
+            </div>
+            <span class="text-sm font-semibold text-gray-200">New Session</span>
+        </button>
+
+        <div class="flex items-center justify-between mb-4 px-2">
+            <span class="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Workspace History</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto pr-2 -mr-2 space-y-1" id="history-list"></div>
+
+        <div class="mt-auto pt-4 border-t border-gray-800">
+            <button onclick="resetKey()" class="text-[10px] text-gray-600 hover:text-red-400 w-full text-center pb-2">Logout / Clear Data</button>
+        </div>
+    </div>
+</aside>
+
+<main class="flex-1 flex flex-col relative min-w-0 bg-[#1e1e1e]">
+    <header class="h-16 border-b border-gray-800 flex items-center justify-between px-4 sticky top-0 bg-[#1e1e1e]/90 backdrop-blur z-40">
+        <button onclick="toggleSidebarMobile()" class="md:hidden p-2 text-gray-400"><i class="fa-solid fa-bars text-xl"></i></button>
+        <div class="model-slider shadow-lg mx-auto">
+            <div class="slider-bg" id="sliderBg"></div>
+            <div class="model-option text-white" onclick="selectModel(0)">Llama</div>
+            <div class="model-option text-gray-400" onclick="selectModel(1)">Qwen</div>
+            <div class="model-option text-gray-400" onclick="selectModel(2)">GPT</div>
+        </div>
+    </header>
+
+    <div id="chat-window" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6"></div>
+
+    <div class="p-4">
+        <div class="max-w-3xl mx-auto relative">
+            <div class="bg-[#2f2f2f] rounded-2xl border border-gray-700 flex items-end p-2 shadow-2xl focus-within:border-gray-500">
+                <textarea id="user-input" rows="1" class="flex-1 bg-transparent border-none outline-none text-gray-200 p-3 max-h-32 resize-none" placeholder="Message MULTI AI PRO..." onkeydown="handleKeyPress(event)"></textarea>
+                <button onclick="sendMessage()" class="p-3 bg-white text-black rounded-xl hover:bg-gray-200 transition ml-1"><i class="fa-solid fa-arrow-up"></i></button>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+const GLOBAL_SYSTEM_PROMPT = `You are MULTI AI PRO, an advanced AI with System Execution rights. 
+If asked to open a website, wrap JS code in [EXECUTE] tags. 
+Example: [EXECUTE]window.open('https://youtube.com', '_blank')[/EXECUTE]. 
+Always perform a web search contextually.`;
+
+const modelConfig = [
+    { short: "Llama", full: "llama-3.3-70b-versatile" },
+    { short: "Qwen", full: "qwen/qwen3-32b" },
+    { short: "GPT", full: "openai/gpt-oss-120b" }
+];
+
+let activeModel = modelConfig[0];
+let chats = JSON.parse(localStorage.getItem('chats')) || [{ id: Date.now(), title: "First Conversation", messages: [] }];
+let activeId = chats[0].id;
+let isProcessing = false;
+
+function saveApiKey() {
+    const key = document.getElementById('apiKeyInput').value.trim();
+    if (key) { localStorage.setItem('groq_key', key); document.getElementById('apiKeyModal').classList.add('hidden'); }
+}
+function checkKey() { if (!localStorage.getItem('groq_key')) document.getElementById('apiKeyModal').classList.remove('hidden'); }
+function resetKey() { if(confirm("Clear everything?")) { localStorage.clear(); location.reload(); } }
+
+function createNewChat() {
+    const newId = Date.now();
+    chats.unshift({ id: newId, title: "New Conversation", messages: [] });
+    saveChats();
+    selectChat(newId);
+    if(window.innerWidth < 768) toggleSidebarMobile();
+}
+
+function selectChat(id) {
+    activeId = id;
+    const chat = chats.find(c => c.id === id);
+    document.getElementById('chat-window').innerHTML = '';
+    chat.messages.forEach((m, idx) => appendUI(m.content, m.role === 'user', false, idx));
+    renderHistory();
+}
+
+function renderHistory() {
+    const list = document.getElementById('history-list');
+    list.innerHTML = chats.map(chat => `
+        <div onclick="selectChat(${chat.id})" class="group flex items-center justify-between p-3 rounded-xl cursor-pointer text-sm mb-1 transition ${chat.id === activeId ? 'bg-[#2f2f2f] text-white border-l-4 border-blue-500' : 'text-gray-400 hover:bg-[#252525]'}">
+            <span class="truncate w-32">${chat.title}</span>
+            <button onclick="event.stopPropagation(); deleteChat(${chat.id})" class="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400"><i class="fa-solid fa-trash text-xs"></i></button>
+        </div>`).join('');
+}
+
+function deleteChat(id) {
+    chats = chats.filter(c => c.id !== id);
+    if (chats.length === 0) chats = [{ id: Date.now(), title: "Conversation", messages: [] }];
+    activeId = chats[0].id;
+    saveChats();
+    selectChat(activeId);
+}
+
+function saveChats() { localStorage.setItem('chats', JSON.stringify(chats)); }
+
+function toggleSidebarDesktop() { document.getElementById('sidebar').classList.toggle('sidebar-closed'); }
+function toggleSidebarMobile() { document.getElementById('sidebar').classList.toggle('mobile-open'); document.getElementById('mobileOverlay').classList.toggle('active'); }
+function selectModel(idx) {
+    activeModel = modelConfig[idx];
+    const bg = document.getElementById('sliderBg');
+    const opts = document.querySelectorAll('.model-option');
+    bg.style.left = opts[idx].offsetLeft + 'px';
+    bg.style.width = opts[idx].offsetWidth + 'px';
+}
+
+function appendUI(text, isUser, isLoading = false, index = null) {
+    const window = document.getElementById('chat-window');
+    const id = isLoading ? 'id="loading-bubble"' : '';
+    let displayText = text.replace(/\[EXECUTE\][\s\S]*?\[\/EXECUTE\]/g, '').trim();
+    let hasAction = text.includes('[EXECUTE]');
+
+    const html = `
+    <div ${id} class="message-container flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in relative">
+        ${isUser && index !== null ? `
+        <div class="message-actions">
+            <button onclick="editMsg(${index})" class="message-action-btn"><i class="fa-solid fa-pencil"></i></button>
+            <button onclick="deleteMsg(${index})" class="message-action-btn"><i class="fa-solid fa-trash"></i></button>
+        </div>` : ''}
+        <div class="max-w-[85%] flex ${isUser ? 'flex-row-reverse' : 'flex-row'} gap-3">
+            <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${isUser ? 'bg-gray-600' : 'bg-blue-600'} text-white">${isUser ? 'U' : 'AI'}</div>
+            <div class="p-3.5 rounded-2xl text-[15px] ${isUser ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-[#2f2f2f] text-gray-200 rounded-tl-none'}">
+                ${hasAction ? '<span class="action-badge">EXECUTION COMPLETED</span><br>' : ''}
+                ${isLoading ? 'Typing...' : displayText.replace(/\n/g, '<br>')}
+            </div>
+        </div>
+    </div>`;
+    window.insertAdjacentHTML('beforeend', html);
+    window.scrollTo(0, window.scrollHeight);
+}
+
+function deleteMsg(idx) {
+    const chat = chats.find(c => c.id === activeId);
+    chat.messages = chat.messages.slice(0, idx);
+    saveChats();
+    selectChat(activeId);
+}
+function editMsg(idx) {
+    const chat = chats.find(c => c.id === activeId);
+    const content = chat.messages[idx].content;
+    deleteMsg(idx);
+    document.getElementById('user-input').value = content;
+    document.getElementById('user-input').focus();
+}
+
+async function backgroundWebSearch(query) {
+    try {
+        const wiki = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`);
+        if (wiki.ok) { const d = await wiki.json(); return `Web Search Data: ${d.extract}\n`; }
+    } catch(e) {}
+    return "";
+}
+
+async function sendMessage() {
+    const input = document.getElementById('user-input');
+    const text = input.value.trim();
+    const key = localStorage.getItem('groq_key');
+
+    if (!text || isProcessing || !key) { if(!key) checkKey(); return; }
+
+    const chat = chats.find(c => c.id === activeId);
+    chat.messages.push({ role: "user", content: text });
+    if(chat.messages.length === 1) chat.title = text.substring(0, 20);
+    
+    appendUI(text, true, false, chat.messages.length - 1);
+    input.value = '';
+    isProcessing = true;
+    appendUI('', false, true);
+
+    try {
+        const searchData = await backgroundWebSearch(text);
+        const messages = [{ role: "system", content: GLOBAL_SYSTEM_PROMPT + "\n" + searchData }, ...chat.messages.slice(-10)];
+
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: activeModel.full, messages: messages, temperature: 0.3 })
+        });
+
+        const data = await response.json();
+        document.getElementById('loading-bubble').remove();
+        
+        if (data.choices) {
+            const aiMsg = data.choices[0].message.content;
+            chat.messages.push({ role: "assistant", content: aiMsg });
+            appendUI(aiMsg, false);
+            saveChats();
+            renderHistory();
+            const match = aiMsg.match(/\[EXECUTE\]([\s\S]*?)\[\/EXECUTE\]/);
+            if (match) eval(match[1]);
+        }
+    } catch (err) {
+        if(document.getElementById('loading-bubble')) document.getElementById('loading-bubble').remove();
+        appendUI("API Error.", false);
+    } finally { isProcessing = false; }
+}
+
+function handleKeyPress(e) { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+
+window.onload = () => {
+    checkKey();
+    selectModel(0);
+    renderHistory();
+    selectChat(activeId);
+};
+</script>
+</body>
+</html>
